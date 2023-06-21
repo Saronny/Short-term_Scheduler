@@ -1,5 +1,4 @@
 #!/bin/bash
-# Student Names: Mike Dudok (1026366), Timo van der Ven (1024454)
 
 # Function to validate the file format
 validate_file() {
@@ -33,7 +32,45 @@ validate_file() {
   done < "$file"
 }
 
+# Function to simulate round-robin scheduling
+simulate_round_robin() {
+  local -n process_list=$1
+  local time_passed=0
 
+  declare -A processes_time_left
+  for process in "${process_list[@]}"; do
+    IFS=',' read -r process_id arrival_time burst_time <<< "$process"
+    processes_time_left["$process_id"]=$burst_time
+  done
+
+  local num_processes=${#processes_time_left[@]}
+  local process_keys=(${!processes_time_left[@]})
+
+  while (( num_processes > 0 )); do
+    local idle=true
+    for ((i=0; i<${#process_list[@]}; i++)); do
+      local process_id=${process_list[$i]%%,*}
+      local arrival_time=${process_list[$i]#*,}
+      arrival_time=${arrival_time%%,*}
+
+      if (( processes_time_left["$process_id"] > 0 && time_passed >= arrival_time )); then
+        echo "$time_passed. $process_id is using the CPU"
+        processes_time_left["$process_id"]=$((processes_time_left["$process_id"] - 1))
+        time_passed=$((time_passed + 1))
+        idle=false
+        if (( processes_time_left["$process_id"] <= 0 )); then
+          echo "$time_passed. Process $process_id terminated"
+          unset processes_time_left["$process_id"]
+          num_processes=${#processes_time_left[@]}
+        fi
+      fi
+    done
+    if [ "$idle" = true ]; then
+      echo "$time_passed. idle"
+      time_passed=$((time_passed + 1))
+    fi
+  done
+}
 
 # Parse command line options -file file.txt using file parameters
 if [ "$1" == "-file" ]; then
@@ -52,12 +89,13 @@ else
   exit 1
 fi
 
-
 validate_file "$input_file"
 
 # Example usage
 echo "Input file: $input_file"
 
+# load the data from the file into an array
+processes=($(cat $input_file))
+# call the function, passing the name of the array variable
+simulate_round_robin processes
 
-
- 
